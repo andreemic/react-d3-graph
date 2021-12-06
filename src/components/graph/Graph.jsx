@@ -361,6 +361,7 @@ export default class Graph extends React.Component {
   /**
    * Collapses the nodes, then checks if the click is doubled and calls the callback passed to the component.
    * @param  {string} clickedNodeId - The id of the node where the click was performed.
+   * @param {Object} e - native click event.
    * @returns {undefined}
    */
   onClickNode = (clickedNodeId, e) => {
