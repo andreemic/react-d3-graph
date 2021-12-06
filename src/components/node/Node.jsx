@@ -57,7 +57,7 @@ export default class Node extends React.Component {
    * Handle click on the node.
    * @returns {undefined}
    */
-  handleOnClickNode = () => this.props.onClickNode && this.props.onClickNode(this.props.id);
+  handleOnClickNode = e => this.props.onClickNode && this.props.onClickNode(this.props.id, e);
 
   /**
    * Handle right click on the node.
