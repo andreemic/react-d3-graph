@@ -363,7 +363,7 @@ export default class Graph extends React.Component {
    * @param  {string} clickedNodeId - The id of the node where the click was performed.
    * @returns {undefined}
    */
-  onClickNode = clickedNodeId => {
+  onClickNode = (clickedNodeId, e) => {
     const clickedNode = this.state.nodes[clickedNodeId];
     if (!this.nodeClickTimer) {
       // Note: onDoubleClickNode is not defined we don't need a long wait
@@ -392,7 +392,7 @@ export default class Graph extends React.Component {
               d3Links,
             },
             () => {
-              this.props.onClickNode && this.props.onClickNode(clickedNodeId, clickedNode);
+              this.props.onClickNode && this.props.onClickNode(clickedNodeId, clickedNode, e);
 
               if (isExpanding) {
                 this._graphNodeDragConfig();
@@ -400,12 +400,12 @@ export default class Graph extends React.Component {
             }
           );
         } else {
-          this.props.onClickNode && this.props.onClickNode(clickedNodeId, clickedNode);
+          this.props.onClickNode && this.props.onClickNode(clickedNodeId, clickedNode, e);
         }
         this.nodeClickTimer = null;
       }, ttl);
     } else {
-      this.props.onDoubleClickNode && this.props.onDoubleClickNode(clickedNodeId, clickedNode);
+      this.props.onDoubleClickNode && this.props.onDoubleClickNode(clickedNodeId, clickedNode, e);
       this.nodeClickTimer = clearTimeout(this.nodeClickTimer);
     }
   };
