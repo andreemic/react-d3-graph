@@ -95,6 +95,7 @@ export default class Node extends React.Component {
       fontSize: this.props.fontSize,
       fontWeight: this.props.fontWeight,
       opacity: this.props.opacity,
+      style: { pointerEvents: "none" },
       ...(this.props.labelClass && { className: this.props.labelClass }),
     };
 
