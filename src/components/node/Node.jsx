@@ -7,7 +7,7 @@ import { logWarning } from "../../utils";
 /**
  * Node component is responsible for encapsulating node render.
  * @example
- * const onClickNode = function(nodeId) {
+ * const onClickNode = function(nodeId, e) {
  *     window.alert('Clicked node', nodeId);
  * };
  *
@@ -55,6 +55,7 @@ import { logWarning } from "../../utils";
 export default class Node extends React.Component {
   /**
    * Handle click on the node.
+   * @param {Object} event - native event.
    * @returns {undefined}
    */
   handleOnClickNode = e => this.props.onClickNode && this.props.onClickNode(this.props.id, e);

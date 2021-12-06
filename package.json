@@ -50,7 +50,7 @@
     "@babel/preset-react": "7.0.0",
     "@cypress/webpack-preprocessor": "4.1.0",
     "babel-loader": "8.0.6",
-    "cross-env": "5.2.1",
+    "cross-env": "^5.2.1",
     "css-loader": "2.0.2",
     "cypress": "3.8.3",
     "d3": "^5.5.0",
