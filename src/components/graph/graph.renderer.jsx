@@ -191,7 +191,8 @@ function renderGraph(
   config,
   highlightedNode,
   highlightedLink,
-  transform
+  transform,
+  draggingEdge
 ) {
   return {
     nodes: _renderNodes(nodes, nodeCallbacks, config, highlightedNode, highlightedLink, transform, linksMatrix),

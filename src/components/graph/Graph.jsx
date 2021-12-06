@@ -18,10 +18,16 @@ import {
   initializeGraphState,
   initializeNodes,
   isPositionInBounds,
+  getNormalizedNodeCoordinates,
+  bi,
 } from "./graph.helper";
 import { renderGraph } from "./graph.renderer";
 import { merge, debounce, throwErr } from "../../utils";
-
+import { Link } from "../..";
+import { buildLinkProps } from "./graph.builder";
+import { buildLinkPathDefinition } from "../link/link.helper";
+import { LINE_TYPES } from "../link/link.const";
+import { SELF_LINK_DIRECTION } from "../link/link.const";
 /**
  * Graph component is the main component for react-d3-graph components, its interface allows its user
  * to build the graph once the user provides the data, configuration (optional) and callback interactions (also optional).
@@ -173,9 +179,10 @@ export default class Graph extends React.Component {
   /**
    * This method runs {@link d3-drag|https://github.com/d3/d3-drag}
    * against the current graph.
+   * @param {Object} e
    * @returns {undefined}
    */
-  _graphNodeDragConfig() {
+  _graphNodeDragConfig(e) {
     const customNodeDrag = d3Drag()
       .on("start", this._onDragStart)
       .on("drag", this._onDragMove)
@@ -214,10 +221,16 @@ export default class Graph extends React.Component {
    */
   _onDragEnd = () => {
     this.isDraggingNode = false;
+    this.isConnectingNodes = false;
 
     if (this.state.draggedNode) {
-      this.onNodePositionChange(this.state.draggedNode);
-      this._tick({ draggedNode: null });
+      if (this.state.draggingEdge && this.state.hoveringOverNodeId) {
+        this.props.onNodesConnected(this.state.draggedNode.id, this.state.hoveringOverNodeId);
+        this._tick({ draggedNode: null, draggingEdge: null });
+      } else {
+        this.onNodePositionChange(this.state.draggedNode);
+        this._tick({ draggedNode: null });
+      }
     }
 
     !this.state.config.staticGraph &&
@@ -236,10 +249,10 @@ export default class Graph extends React.Component {
    */
   _onDragMove = (ev, index, nodeList) => {
     const id = nodeList[index].id;
+    let draggedNode = this.state.nodes[id];
 
     if (!this.state.config.staticGraph) {
       // this is where d3 and react bind
-      let draggedNode = this.state.nodes[id];
 
       draggedNode.oldX = draggedNode.x;
       draggedNode.oldY = draggedNode.y;
@@ -247,16 +260,25 @@ export default class Graph extends React.Component {
       const newX = draggedNode.x + d3Event.dx;
       const newY = draggedNode.y + d3Event.dy;
       const shouldUpdateNode = !this.state.config.bounded || isPositionInBounds({ x: newX, y: newY }, this.state);
-
       if (shouldUpdateNode) {
-        draggedNode.x = newX;
-        draggedNode.y = newY;
+        if (this.isDraggingNode) {
+          draggedNode.x = newX;
+          draggedNode.y = newY;
 
-        // set nodes fixing coords fx and fy
-        draggedNode["fx"] = draggedNode.x;
-        draggedNode["fy"] = draggedNode.y;
+          // set nodes fixing coords fx and fy
+          draggedNode["fx"] = draggedNode.x;
+          draggedNode["fy"] = draggedNode.y;
 
-        this._tick({ draggedNode });
+          this._tick({ draggedNode });
+        } else if (this.isConnectingNodes) {
+          this._tick({
+            draggingEdge: {
+              from: { x: draggedNode.x, y: draggedNode.y },
+              to: { x: d3Event.x, y: d3Event.y },
+            },
+            draggedNode,
+          });
+        }
       }
     }
   };
@@ -265,8 +287,13 @@ export default class Graph extends React.Component {
    * Handles d3 drag 'start' event.
    * @returns {undefined}
    */
-  _onDragStart = () => {
-    this.isDraggingNode = true;
+  _onDragStart = e => {
+    if (this.ctrlPressed) {
+      this.isConnectingNodes = true;
+    } else {
+      this.isDraggingNode = true;
+    }
+
     this.pauseSimulation();
 
     if (this.state.enableFocusAnimation) {
@@ -428,7 +455,8 @@ export default class Graph extends React.Component {
    * @returns {undefined}
    */
   onMouseOverNode = id => {
-    if (this.isDraggingNode) {
+    if (this.isDraggingNode || this.isConnectingNodes) {
+      this.setState({ ...this.state, hoveringOverNodeId: id });
       return;
     }
 
@@ -641,6 +669,22 @@ export default class Graph extends React.Component {
 
     // graph zoom and drag&drop all network
     this._zoomConfig();
+
+    this.ctrlPressed = false;
+    document.addEventListener("keydown", this.handleKeyDown.bind(this), false);
+    document.addEventListener("keyup", this.handleKeyUp.bind(this), false);
+
+    return () => {
+      document.removeEventListener("keydown", this.handleKeyDown, false);
+      document.addEventListener("keyup", this.handleKeyUp, false);
+    };
+  }
+
+  handleKeyDown(e) {
+    this.ctrlPressed = this.ctrlPressed || e.key === "Meta";
+  }
+  handleKeyUp(e) {
+    this.ctrlPressed = this.ctrlPressed && e.key !== "Meta";
   }
 
   componentWillUnmount() {
@@ -688,6 +732,23 @@ export default class Graph extends React.Component {
 
     const containerProps = this._generateFocusAnimationProps();
 
+    let sourceCoords, targetCoords;
+    if (this.state.draggingEdge) {
+      let r = getNormalizedNodeCoordinates(
+        {
+          sourceId: "s",
+          targetId: "t",
+          sourceCoords: this.state.draggingEdge.from,
+          targetCoords: this.state.draggingEdge.to,
+        },
+        { s: {}, t: {} },
+        this.state.config,
+        1.25
+      );
+      sourceCoords = r.sourceCoords;
+      targetCoords = r.targetCoords;
+    }
+
     return (
       <div id={`${this.state.id}-${CONST.GRAPH_WRAPPER_ID}`}>
         <svg name={`svg-container-${this.state.id}`} style={svgStyle} onClick={this.onClickGraph}>
@@ -695,6 +756,27 @@ export default class Graph extends React.Component {
           <g id={`${this.state.id}-${CONST.GRAPH_CONTAINER_ID}`} {...containerProps}>
             {links}
             {nodes}
+            {this.state.draggingEdge && (
+              <Link
+                d={buildLinkPathDefinition(
+                  sourceCoords,
+                  targetCoords,
+                  LINE_TYPES.STRAIGHT,
+                  [],
+                  "s",
+                  "t",
+                  SELF_LINK_DIRECTION.TOP_RIGHT
+                )}
+                source="s"
+                target="t"
+                markerId="marker-small"
+                strokeWidth={1.5}
+                stroke="green"
+                className="link"
+                opacity={1}
+                mouseCursor="pointer"
+              />
+            )}
           </g>
         </svg>
       </div>
